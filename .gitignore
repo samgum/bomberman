@@ -1,0 +1,7 @@
+dist/
+verification/
+node_modules/
+.wrangler/
+__pycache__/
+*.pyc
+*.prg

@@ -1,0 +1,24 @@
+{
+  "game": {
+    "repository": "https://github.com/emu-russia/bomberman-nes",
+    "commit": "61b62c8d35e6972d5e11abeec876dfd558b7510d",
+    "prg_crc32": "A913A222",
+    "chr_crc32": "1DB14E97",
+    "rom_md5": "97ddb647898b01065f395eb64c3d131f",
+    "rom_sha256": "4e57f08754a2ff7ec788245629fb70f99d4e003f66f86742566bca99c810a244"
+  },
+  "font": {
+    "repository": "https://github.com/TakWolf/fusion-pixel-font",
+    "release": "2026.09.25",
+    "source_font": "fusion-pixel-12px-proportional-zh_hans.otf.woff2",
+    "archive_sha256": "44b456f6f920d700f98d5865e03152d6a7357ed0a8ee388376ac0530d2d57072",
+    "license": "OFL-1.1"
+  },
+  "runtime": {
+    "repository": "https://github.com/bfirsh/jsnes",
+    "version": "2.1.0",
+    "package": "https://registry.npmjs.org/jsnes/-/jsnes-2.1.0.tgz",
+    "integrity": "sha512-LUa++E5Dfs1A6ZYB5HiSOR4JrUzrZEXGLZ5Imczhu9lkg7f+94SqnLZ/MXwGa7oc02+j/xYyHR0azGQ6LCU68g==",
+    "license": "Apache-2.0"
+  }
+}

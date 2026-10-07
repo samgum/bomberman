@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN" data-phase="loading">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="description" content="FC 初代炸弹人，原版像素画面、音乐和完整 50 关。支持手机、电脑、平板、微信浏览器和折叠屏。">
+  <title>炸弹人 · FC 经典版</title>
+  <link rel="icon" href="assets/bomb.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app/style.css">
+  <script type="module" src="app/main.js"></script>
+</head>
+<body>
+  <section id="boot" class="boot" role="status" aria-label="游戏准备界面">
+    <div class="boot-content"><span class="boot-name">BOMBERMAN</span><span class="boot-edition">FC 经典版 / 50 关</span><div class="boot-meter" role="progressbar" aria-label="资源准备进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="boot-bar"></span></div><p id="boot-status">正在准备游戏…</p><p id="boot-note">资源准备完成后自动进入</p><button id="retry" class="plain-button" hidden>重新加载</button></div>
+  </section>
+  <div class="app" id="app" aria-label="炸弹人游戏">
+    <header class="topbar">
+      <a class="brand" href="./">BOMBERMAN <small>FC</small></a>
+      <nav class="toolbar" aria-label="游戏工具"><button id="help-button" class="tool" aria-label="操作说明">玩法</button><button id="fullscreen-button" class="tool fullscreen-control" aria-label="进入全屏">全屏</button><button id="pause-button" class="tool" aria-label="暂停游戏" disabled>暂停</button></nav>
+    </header>
+    <main class="play-layout">
+      <section class="display-panel" aria-label="原版游戏画面">
+        <div class="game-window" id="game-window">
+          <canvas id="game" width="256" height="240" tabindex="0" aria-label="炸弹人游戏，方向键或 WASD 移动，Z 或空格放炸弹，X 遥控引爆">浏览器需要支持 Canvas 才能运行游戏。</canvas>
+          <div id="menu" class="menu-home" hidden>
+            <div class="home-grid">
+              <div class="home-artwork">
+                <p class="home-edition"><span class="pixel-dot"></span> FC / NES · 原版 50 关</p>
+                <img class="original-title" src="assets/title.svg" width="224" height="112" alt="Bomberman 原版像素标题">
+                <div class="home-cast" aria-hidden="true"><img src="assets/player.svg" width="16" height="16" alt=""><span class="cast-track"></span><img class="cast-bomb" src="assets/bomb.svg" width="16" height="16" alt=""><span class="cast-track"></span><img src="assets/enemy.svg" width="16" height="16" alt=""></div>
+              </div>
+              <section class="home-actions" aria-labelledby="menu-save-title">
+                <p id="menu-save-label" class="save-label">经典单人模式</p>
+                <h1 id="menu-save-title">准备开始</h1>
+                <p id="menu-save-info">消灭敌人，找到出口，进入下一关。</p>
+                <div class="home-buttons"><button id="continue-button" class="start-button" hidden><span>继续游戏</span><span class="button-arrow" aria-hidden="true">→</span></button><button id="start-button" class="start-button"><span>开始游戏</span><span class="button-arrow" aria-hidden="true">→</span></button></div>
+                <button id="home-help-button" class="home-help"><span class="help-pixel" aria-hidden="true">?</span><span>查看操作说明</span><span aria-hidden="true">↗</span></button>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div class="key-guide" id="keyboard-guide" aria-label="键盘快捷键"><div class="key-item"><span class="keycaps"><kbd>方向键</kbd><span class="key-or">/</span><kbd>WASD</kbd></span><strong>移动</strong></div><div class="key-item"><span class="keycaps"><kbd>Z</kbd><span class="key-or">/</span><kbd>空格</kbd></span><strong>放炸弹</strong></div><div class="key-item"><span class="keycaps"><kbd>X</kbd></span><strong>遥控引爆</strong></div></div>
+      </section>
+      <section id="touch-controls" class="touch-controls" aria-label="触屏控制">
+        <div id="dpad" class="dpad" role="group" aria-label="方向控制，按住并滑动可以连续转向"><button data-button="up" class="up direction" aria-label="向上">▲</button><button data-button="left" class="left direction" aria-label="向左">◀</button><span class="center" aria-hidden="true">●</span><button data-button="right" class="right direction" aria-label="向右">▶</button><button data-button="down" class="down direction" aria-label="向下">▼</button></div>
+        <div class="system-controls"><button id="touch-start" class="system-button">START</button><button id="touch-select" class="system-button">SELECT</button></div>
+        <div class="action-controls"><button id="touch-a" data-button="a" class="action-button a-button" aria-label="放炸弹"><strong>A</strong><span>放炸弹</span></button><button id="touch-b" data-button="b" class="action-button b-button" aria-label="遥控引爆，需拾取遥控道具"><strong>B</strong><span>引爆</span></button></div>
+      </section>
+    </main>
+    <footer class="statusbar"><span id="game-status" aria-live="polite">FC 经典版 · 原版 50 关</span><span id="save-status" aria-live="polite">自动保存至当前设备</span><a href="https://github.com/samgum/bomberman" target="_blank" rel="noopener noreferrer" aria-label="查看 GitHub 项目">GitHub ↗</a></footer>
+  </div>
+  <dialog id="pause-dialog" class="pause-dialog" aria-labelledby="pause-title"><h1 id="pause-title">暂停</h1><p id="pause-reason">准备好后继续游戏。</p><button id="resume-button" class="start-button">继续游戏</button><div class="pause-actions"><button id="save-button" class="plain-button">保存进度</button><button id="settings-button" class="plain-button">设置</button><button id="pause-fullscreen" class="plain-button fullscreen-control">全屏</button><button id="menu-button" class="plain-button">返回菜单</button></div><p id="pause-save-status" class="subtle">正在保存当前进度…</p></dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title"><div class="dialog-header"><h1 id="settings-title">设置</h1><button class="dialog-close" id="settings-close" aria-label="关闭设置">×</button></div><label class="setting"><span>音量 <output id="volume-value">45%</output></span><input id="volume" type="range" min="0" max="100" value="45"></label><label class="setting"><span>操控布局</span><select id="control-layout"><option value="auto">自动适配设备</option><option value="touch">显示触屏按钮</option><option value="keyboard">键盘 / 手柄</option></select></label><label class="setting touch-setting"><span>触屏按钮大小 <output id="control-size-value">100%</output></span><input id="control-size" type="range" min="100" max="125" step="5" value="100"></label><label class="setting switch-setting"><span>震动反馈</span><input id="haptics" type="checkbox"></label><label class="setting switch-setting"><span>高刷显示<small>跟随屏幕刷新率绘制，原版逻辑为 60Hz</small></span><input id="high-refresh" type="checkbox" checked></label><button class="plain-button settings-done" id="settings-done">完成</button></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><h1 id="help-title">操作说明</h1><button class="dialog-close" id="help-close" aria-label="关闭操作说明">×</button></div><p>消灭所有敌人，炸开藏有出口的砖墙，进入下一关。炸弹也会伤到自己，记得留好退路。</p><dl class="instructions"><div><dt>移动</dt><dd>方向键 / WASD / 触屏十字键 / 手柄方向键或左摇杆</dd></div><div><dt>放炸弹</dt><dd><strong>Z / 空格 / 触屏 A / 手柄 A</strong></dd></div><div><dt>遥控引爆</dt><dd>X / 触屏 B / 手柄 B，需要先拾取遥控道具</dd></div><div><dt>暂停</dt><dd>P / Esc / 顶部暂停按钮 / 手柄 Start</dd></div><div><dt>原版菜单</dt><dd>Enter / START 确认，Shift / SELECT 切换选项</dd></div></dl><p class="subtle">自动存档会保存当前地图、位置、道具和计时。离开、暂停或返回菜单时也会保存；更换设备或清除网站数据后无法继续原来的本地进度。</p><button class="plain-button settings-done" id="help-done">知道了</button></dialog>
+  <dialog id="new-game-dialog" aria-labelledby="new-game-title"><h1 id="new-game-title">开始新游戏？</h1><p>将替换这台设备上的当前存档，从第 1 关开始。</p><div class="pause-actions"><button id="new-game-cancel" class="plain-button">取消</button><button id="new-game-confirm" class="start-button">开始新游戏</button></div></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

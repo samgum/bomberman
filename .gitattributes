@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.nes binary
+*.CHR binary
+*.woff2 binary
+vendor/bomberman-source/* -text
+vendor/font-licenses/* -text
