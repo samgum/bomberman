@@ -6,7 +6,10 @@ export class OfflinePackage {
       if(event.data?.type==='OFFLINE_STATUS')this.sync(event.data.state);
     });
   }
-  sync(next){this.state={...this.state,...next};this.render(this.state);if(next.error)this.toast(next.error);}
+  sync(next){
+    if(next.updated && next.version===document.documentElement.dataset.build)next={...next,error:''};
+    this.state={...this.state,...next};this.render(this.state);if(next.error)this.toast(next.error);
+  }
   async message(type){
     const worker=this.registration?.active || navigator.serviceWorker?.controller;
     if(!worker)throw new Error('离线功能正在准备，请稍后重试。');

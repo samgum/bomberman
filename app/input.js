@@ -116,8 +116,29 @@ export class GameInput {
   }
   bindSurface(surface,type) {
     surface.addEventListener('contextmenu',event => event.preventDefault());
+    // A canceled PointerEvent does not cancel WKWebView's native long-press
+    // recognizer. Fingers use Touch Events even on browsers with PointerEvent.
+    const touchPrimary='ontouchstart' in window;
+    surface.addEventListener('touchstart',event => {
+      event.preventDefault();
+      if (!this.active) return;
+      Array.from(event.changedTouches).filter(touch=>surface.contains(touch.target)).forEach(touch => this.pointerDown('touch:'+touch.identifier,touch.clientX,touch.clientY,type));
+    },{passive:false});
+    document.addEventListener('touchmove',event => {
+      const changed=Array.from(event.changedTouches).filter(touch=>this.pointers.has('touch:'+touch.identifier));
+      if(!changed.length)return;
+      event.preventDefault();
+      changed.forEach(touch => this.pointerMove('touch:'+touch.identifier,touch.clientX,touch.clientY));
+    },{passive:false});
+    ['touchend','touchcancel'].forEach(name => document.addEventListener(name,event => {
+      const changed=Array.from(event.changedTouches).filter(touch=>this.pointers.has('touch:'+touch.identifier));
+      if(!changed.length)return;
+      event.preventDefault();
+      changed.forEach(touch => this.pointerUp('touch:'+touch.identifier));
+    },{passive:false}));
     if ('PointerEvent' in window) {
       surface.addEventListener('pointerdown',event => {
+        if(event.pointerType==='touch' && touchPrimary)return;
         if (!this.active || (event.pointerType==='mouse' && event.button!==0)) return;
         event.preventDefault();
         surface.setPointerCapture(event.pointerId);
@@ -125,22 +146,6 @@ export class GameInput {
       });
       surface.addEventListener('pointermove',event => { if (this.pointers.has(event.pointerId)) { event.preventDefault(); this.pointerMove(event.pointerId,event.clientX,event.clientY); } });
       ['pointerup','pointercancel','lostpointercapture'].forEach(name => surface.addEventListener(name,event => this.pointerUp(event.pointerId)));
-    } else {
-      surface.addEventListener('touchstart',event => {
-        if (!this.active) return;
-        event.preventDefault();
-        Array.from(event.changedTouches).forEach(touch => this.pointerDown(touch.identifier,touch.clientX,touch.clientY,type));
-      },{passive:false});
-      document.addEventListener('touchmove',event => {
-        if (!this.pointers.size) return;
-        event.preventDefault();
-        Array.from(event.changedTouches).forEach(touch => this.pointerMove(touch.identifier,touch.clientX,touch.clientY));
-      },{passive:false});
-      ['touchend','touchcancel'].forEach(name => document.addEventListener(name,event => {
-        if (!this.pointers.size) return;
-        event.preventDefault();
-        Array.from(event.changedTouches).forEach(touch => this.pointerUp(touch.identifier));
-      },{passive:false}));
     }
   }
   pollGamepads() {

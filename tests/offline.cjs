@@ -9,7 +9,7 @@ const report={base,checks:[]};
 const activeBrowsers=new Set();
 const testOrigins=new Set();
 async function isolatedOrigin(){
-  let online=true,corruptPath='';
+  let online=true,corruptPath='',entryMarker='';
   const root=path.resolve('dist');
   const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.woff2':'font/woff2'};
   const server=http.createServer(async(request,response)=>{
@@ -20,11 +20,13 @@ async function isolatedOrigin(){
       if(pathname===corruptPath){response.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}).end('<svg xmlns="http://www.w3.org/2000/svg"/>');return;}
       const file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
       if(!file.startsWith(root+path.sep)){response.writeHead(403).end();return;}
-      const data=await fs.readFile(file);response.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store','Content-Encoding':'gzip','Vary':'Accept-Encoding'});response.end(zlib.gzipSync(data));
+      let data=await fs.readFile(file);
+      if(entryMarker && path.basename(file)==='index.html')data=Buffer.from(data.toString().replace('<body>','<body data-network-entry="'+entryMarker+'">'));
+      response.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store','Content-Encoding':'gzip','Vary':'Accept-Encoding'});response.end(zlib.gzipSync(data));
     } catch {response.writeHead(404).end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const origin={url:'http://127.0.0.1:'+server.address().port,setOnline:value=>{online=value;},corrupt:value=>{corruptPath=value;},close:()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})};
+  const origin={url:'http://127.0.0.1:'+server.address().port,setOnline:value=>{online=value;},corrupt:value=>{corruptPath=value;},markEntry:value=>{entryMarker=value;},close:()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})};
   testOrigins.add(origin);return origin;
 }
 async function waitMenu(page){await page.waitForFunction(()=>document.documentElement.dataset.phase==='menu',null,{timeout:30000});}
@@ -62,6 +64,15 @@ async function check(name,action){await action();report.checks.push(name);consol
       const state=await packageState(page);assert.equal(state.names.length,1);assert.ok(state.files.includes('/game/bomberman.nes'));
       assert.ok(state.files.some(file=>/game-.*\.js$/.test(file)));
     });
+    if(origin)await check(name+' online reload receives fresh HTML despite cached package',async()=>{
+      origin.markEntry('fresh');await page.reload({waitUntil:'domcontentloaded'});await waitMenu(page);
+      assert.equal(await page.locator('body').getAttribute('data-network-entry'),'fresh');origin.markEntry('');
+    });
+    if(process.argv[2]==='freshness'){
+      await context.close();await browser.close();activeBrowsers.delete(browser);
+      if(origin){await origin.close();testOrigins.delete(origin);}
+      continue;
+    }
     await page.locator('#start-button').click();await page.waitForFunction(()=>__testNes.cpu.mem[0x93]>0);
     await page.locator('#pause-button').click();await page.waitForFunction(()=>document.getElementById('pause-save-status').textContent.includes('已保存'));
     const save=await savedRecord(page);assert.ok(save && save!=='null');
@@ -109,6 +120,7 @@ async function check(name,action){await action();report.checks.push(name);consol
     await context.close();await browser.close();activeBrowsers.delete(browser);
     if(origin){await origin.close();testOrigins.delete(origin);}
   }
-  await fs.writeFile('verification/offline-report.json',JSON.stringify(report,null,2));
-  console.log(JSON.stringify({passed:report.checks.length,report:path.resolve('verification/offline-report.json')}));
+  const reportFile=process.argv[2]==='freshness'?'verification/offline-freshness-report.json':'verification/offline-report.json';
+  await fs.writeFile(reportFile,JSON.stringify(report,null,2));
+  console.log(JSON.stringify({passed:report.checks.length,report:path.resolve(reportFile)}));
 })().catch(async error=>{console.error(error);await Promise.all(Array.from(activeBrowsers,browser=>browser.close()));await Promise.all(Array.from(testOrigins,origin=>origin.close()));process.exitCode=1;});

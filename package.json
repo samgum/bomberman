@@ -10,6 +10,7 @@
     "test:browser": "node tests/browser.cjs",
     "test:tablet": "node tests/tablet.cjs",
     "test:offline": "node tests/offline.cjs",
+    "test:interaction": "node tests/interaction.cjs",
     "build:rom": "python scripts/build_rom.py"
   },
   "devDependencies": {

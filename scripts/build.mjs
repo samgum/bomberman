@@ -27,6 +27,7 @@ for(const [name,data] of inputs)if(name.startsWith('assets/') || ['manifest.webm
 published.set(bundleName,Buffer.from(bundle.outputFiles[0].contents));
 published.set(styleName,Buffer.from(style.code));
 let html=inputs.get('index.html').toString().replace('src="app/main.js"','src="'+bundleName+'"').replace('href="app/style.css"','href="'+styleName+'"');
+html=html.replace('<html lang="zh-CN" data-phase="loading">','<html lang="zh-CN" data-phase="loading" data-build="'+version+'">');
 html=html.replace('</head>','  <link rel="preload" href="assets/ui-pixel.woff2" as="font" type="font/woff2" crossorigin>\n</head>');
 published.set('index.html',Buffer.from(html));
 published.set('sw.js',Buffer.from(inputs.get('sw.js').toString().replace('__BUILD_VERSION__',version)));

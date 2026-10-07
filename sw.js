@@ -91,7 +91,10 @@ self.addEventListener('install',event=>{
     await self.skipWaiting();
   }));
 });
-self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{
+  await self.clients.claim();
+  await notify({updated:true,error:'游戏已更新，重新加载页面后生效。'});
+})()));
 self.addEventListener('message',event=>{
   const type=event.data?.type;
   if(!['GET_OFFLINE_STATUS','DOWNLOAD_OFFLINE','DELETE_OFFLINE'].includes(type))return;
@@ -102,6 +105,12 @@ self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
   if(!['http:','https:'].includes(url.protocol) || request.method!=='GET' || url.origin!==self.location.origin)return;
   event.respondWith((async()=>{
+    // Online navigation must see a deployed input fix immediately; cached HTML
+    // remains the fallback when the network is unavailable.
+    if(request.mode==='navigate' || url.pathname===new URL(META).pathname){
+      try {const response=await fetch(request);if(response.ok || response.type==='opaqueredirect')return response;}
+      catch { /* A complete offline package serves the same entry point. */ }
+    }
     if(!await caches.has(PACKAGE))return fetch(request);
     const cache=await caches.open(PACKAGE);
     const key=request.mode==='navigate'?BASE:new URL(url.pathname,BASE).href;
