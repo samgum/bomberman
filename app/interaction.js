@@ -17,7 +17,7 @@ export function protectPageInteractions() {
       const target=touch.target instanceof Element?touch.target:touch.target.parentElement;
       // Native form widgets have no selectable page text. All other surfaces,
       // including buttons and links, must cancel the original iOS touch gesture.
-      if(target?.closest('input,select,textarea'))continue;
+      if(target?.closest('input,select,textarea')){touches.delete(touch.identifier);continue;}
       protectedTouch=true;
       const gameControl=target?.closest('#dpad,#touch-a,#touch-b');
       const control=gameControl?null:target?.closest('button,a,label');
@@ -56,9 +56,15 @@ export function protectPageInteractions() {
     clearSelection();
   },{capture:true,passive:false});
   document.addEventListener('touchcancel',event=>{
-    for(const touch of Array.from(event.changedTouches || []))touches.delete(touch.identifier);
+    const changed=Array.from(event.changedTouches || []);
+    if(!changed.length)touches.clear();
+    else for(const touch of changed)touches.delete(touch.identifier);
     clearSelection();
   },{capture:true,passive:false});
+  const reset=()=>{touches.clear();lastTap=null;clearSelection();};
+  window.addEventListener('blur',reset);
+  window.addEventListener('pagehide',reset);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
   document.addEventListener('click',event=>{
     if(event.isTrusted && event.detail>0 && lastTap && performance.now()-lastTap.time<750 && lastTap.control.contains(event.target)){
       event.preventDefault();event.stopImmediatePropagation();

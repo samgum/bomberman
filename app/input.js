@@ -131,6 +131,10 @@ export class GameInput {
       changed.forEach(touch => this.pointerMove('touch:'+touch.identifier,touch.clientX,touch.clientY));
     },{passive:false});
     ['touchend','touchcancel'].forEach(name => document.addEventListener(name,event => {
+      if(name==='touchcancel' && !event.changedTouches.length){
+        for(const id of Array.from(this.pointers.keys()))if(typeof id==='string' && id.startsWith('touch:'))this.pointerUp(id);
+        return;
+      }
       const changed=Array.from(event.changedTouches).filter(touch=>this.pointers.has('touch:'+touch.identifier));
       if(!changed.length)return;
       event.preventDefault();

@@ -57,6 +57,10 @@ async function touch(page,client,type,points){
     assert.ok(await page.evaluate(()=>__testNes.cpu.mem.slice(0x3a0,0x3aa).some(Boolean)),'second finger plants a bomb');
     await touch(page,client,'touchCancel',[]);await page.waitForTimeout(90);
     assert.equal(await page.locator('.is-pressed').count(),0);assert.deepEqual(await selection(page),{text:'',ranges:0});
+    await touch(page,client,'touchStart',[{id:1,...right}]);await page.waitForTimeout(60);
+    await page.evaluate(()=>{const event=new Event('touchcancel',{bubbles:true,cancelable:true});Object.defineProperty(event,'changedTouches',{value:[]});document.dispatchEvent(event);});
+    assert.equal(await page.locator('.is-pressed').count(),0,'system cancellation without coordinates releases held controls');
+    await touch(page,client,'touchEnd',[]);
     assert.equal(await page.locator('.direction').allTextContents().then(values=>values.join('')),'','arrows have no hidden selectable text');
     const protectedTouches=await page.evaluate(()=>__touchRecords);assert.ok(protectedTouches.length>5);assert.ok(protectedTouches.every(event=>event.prevented),JSON.stringify(protectedTouches));
     report.checks.push(name+' direction hold, two-finger bomb and cancellation remain responsive');
