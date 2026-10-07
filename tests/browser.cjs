@@ -57,6 +57,7 @@ async function bounds(page,selectors) {
   },selectors);
 }
 async function run(name,action) {
+  if(process.argv[2] && !name.includes(process.argv[2]))return;
   try {await action();report.checks.push(name);console.log('PASS '+name);}
   catch(error){report.failures.push({name,message:error.message});console.log('FAIL '+name+': '+error.message);}
 }
@@ -165,10 +166,14 @@ async function run(name,action) {
     await page.screenshot({path:path.join(output,'fold-'+name+'.png')});await context.close();
   });
   await run('desktop native fullscreen and persistent exit control',async()=>{
-    const context=await browser.newContext({viewport:{width:1280,height:800},hasTouch:false});const page=await context.newPage();await ready(page);
-    await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').textContent==='退出全屏');
+    const context=await browser.newContext({viewport:{width:1280,height:800},hasTouch:false});const page=await context.newPage();await instrument(page);await ready(page);await play(page);
+    await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').getAttribute('aria-pressed')==='true');
     assert.ok(await page.evaluate(()=>document.fullscreenElement || document.documentElement.dataset.immersive==='true'));
     assert.deepEqual(await bounds(page,['#fullscreen-button']),[]);
+    await page.waitForFunction(()=>document.activeElement.id==='game');
+    const before=await position(page);await page.keyboard.down('ArrowRight');await page.waitForTimeout(150);await page.keyboard.up('ArrowRight');
+    assert.ok((await position(page)).x>before.x,'keyboard remains active after clicking fullscreen');
+    await page.keyboard.press('KeyZ');await page.waitForTimeout(80);assert.ok((await position(page)).bombs>0,'Z plants a bomb while fullscreen');
     await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').textContent==='全屏');await context.close();
   });
   await run('WeChat preparation waits for all resources and at least three seconds',async()=>{
@@ -198,13 +203,14 @@ async function run(name,action) {
     await page.screenshot({path:path.join(output,'wechat-webkit-menu.png')});await play(page);
     await page.locator('#pause-button').click();await page.waitForFunction(()=>document.getElementById('pause-save-status').textContent.includes('已保存'));
     await page.locator('#resume-button').click();
-    await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').textContent==='退出全屏');
+    await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').getAttribute('aria-pressed')==='true');
     if(await page.locator('#pause-dialog').isVisible())await page.locator('#resume-button').click();
     assert.deepEqual(await bounds(page,['#fullscreen-button','#game','#touch-a']),[]);
     await page.locator('#fullscreen-button').click();await page.waitForFunction(()=>document.getElementById('fullscreen-button').textContent==='全屏');
     assert.deepEqual(errors,[]);await page.screenshot({path:path.join(output,'wechat-webkit-game.png')});await context.close();await safari.close();
   });
-  await fs.writeFile(path.join(output,'browser-report.json'),JSON.stringify(report,null,2));
-  console.log(JSON.stringify({passed:report.checks.length,failed:report.failures.length,report:path.join(output,'browser-report.json')}));
+  const reportName=process.argv[2]?'browser-filtered-report.json':'browser-report.json';
+  await fs.writeFile(path.join(output,reportName),JSON.stringify(report,null,2));
+  console.log(JSON.stringify({passed:report.checks.length,failed:report.failures.length,report:path.join(output,reportName)}));
   if(report.failures.length)process.exitCode=1;
 })().catch(error=>{console.error(error);process.exitCode=1;});

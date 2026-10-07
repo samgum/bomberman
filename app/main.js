@@ -4,11 +4,14 @@ import { GameInput } from './input.js';
 import { FrameClock } from './clock.js';
 import { GameSaves, Preferences } from './storage.js';
 import { GameLayout } from './layout.js';
+import { protectPageInteractions } from './interaction.js';
+import { OfflinePackage } from './offline.js';
 
 const root=document.documentElement;
 const element=id=>document.getElementById(id);
 const text=(id,value)=>{if(element(id).textContent!==value)element(id).textContent=value;};
 const began=performance.now();
+protectPageInteractions();
 const wechat=/MicroMessenger/i.test(navigator.userAgent);
 root.dataset.wechat=wechat?'true':'false';
 let phase='loading';
@@ -27,6 +30,14 @@ function toast(message) {
   clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>element('toast').hidden=true,3000);
 }
 const layout=new GameLayout(element('game'),toast,()=>preferences.value);
+const offline=new OfflinePackage(state=>{
+  text('offline-badge',!state.supported?'暂不支持':state.busy?'准备中':state.ready?'已就绪':'未下载');
+  const size=state.bytes?Math.ceil(state.bytes/1024)+' KB':'';
+  text('offline-state',!state.supported?'此浏览器暂不支持离线包，可以联网游玩。':state.busy?(state.total?'下载中 '+state.completed+' / '+state.total:'正在准备离线资源…'):state.ready?'离线包已准备好'+(size?' · '+size:''):'联网后可下载，准备好后可断网游玩。');
+  element('offline-download').disabled=state.busy || state.ready || !state.supported;
+  element('offline-refresh').disabled=state.busy || !state.supported;
+  element('offline-delete').disabled=state.busy || !state.ready;
+},toast);
 const input=new GameInput(engine,{
   pause:source=>phase==='menu'?(source==='gamepad'?activate():undefined):phase==='paused'?resume():pause(),
   start:()=>{
@@ -43,6 +54,7 @@ function setPhase(next) {
   text('pause-button',menu?'设置':'暂停');
   element('pause-button').setAttribute('aria-label',menu?'打开设置':'暂停游戏');
   element('pause-button').disabled=next==='loading';
+  layout.schedule();
 }
 function updateMenu() {
   root.dataset.save=savedMeta?'true':'false';
@@ -160,12 +172,18 @@ element('settings-button').addEventListener('click',openSettings);
 element('help-button').addEventListener('click',openHelp);
 element('home-help-button').addEventListener('click',openHelp);
 element('retry').addEventListener('click',()=>location.reload());
-element('fullscreen-button').addEventListener('click',()=>layout.fullscreen().catch(()=>toast('暂时无法切换全屏。')));
+element('fullscreen-button').addEventListener('click',async()=>{
+  if(phase==='playing')element('game').focus({preventScroll:true});
+  try {await layout.fullscreen();}
+  catch {toast('暂时无法切换全屏。');}
+  if(phase==='playing')element('game').focus({preventScroll:true});
+});
 element('pause-fullscreen').addEventListener('click',async()=>{
   // A native full-screen element needs to contain the visible dialog.
   element('pause-dialog').close();
-  await layout.fullscreen();
-  if(phase==='paused')element('pause-dialog').showModal();
+  try {await layout.fullscreen();}
+  catch {toast('暂时无法切换全屏。');}
+  finally {if(phase==='paused')element('pause-dialog').showModal();}
 });
 element('pause-dialog').addEventListener('cancel',event=>{event.preventDefault();resume();});
 element('new-game-confirm').addEventListener('click',()=>{element('new-game-dialog').close();startGame(false);});
@@ -176,7 +194,10 @@ element('control-size').addEventListener('input',event=>{preferences.value.contr
 element('control-layout').addEventListener('change',event=>{preferences.value.controlMode=event.target.value;applyPreferences();preferences.save();});
 element('haptics').addEventListener('change',event=>{preferences.value.haptics=event.target.checked;preferences.save();});
 element('high-refresh').addEventListener('change',event=>{preferences.value.highRefresh=event.target.checked;preferences.save();});
-window.addEventListener('blur',()=>pause('离开游戏时已自动暂停。'));
+element('offline-download').addEventListener('click',()=>offline.action('DOWNLOAD_OFFLINE'));
+element('offline-refresh').addEventListener('click',()=>offline.action('DOWNLOAD_OFFLINE'));
+element('offline-delete').addEventListener('click',()=>offline.action('DELETE_OFFLINE'));
+window.addEventListener('blur',()=>{if(!layout.transitioning)pause('离开游戏时已自动暂停。');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause('切到后台时已自动暂停。');});
 window.addEventListener('pagehide',()=>{if(phase==='playing')pause('离开页面时已自动暂停。');else if(phase==='paused')checkpoint();});
 applyPreferences();
@@ -208,6 +229,8 @@ async function ready() {
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,(wechat?3000:400)-(performance.now()-began))));
     element('boot').hidden=true;setPhase('menu');element('menu').hidden=false;
     updateMenu();layout.resize();engine.draw();clock.start();
+    if('requestIdleCallback' in window)requestIdleCallback(()=>offline.init(),{timeout:2000});
+    else setTimeout(()=>offline.init(),300);
     if(saves.problem)toast(saves.problem);
     if(!saves.available)text('save-status','此浏览器无法保存');
   } catch(error) {

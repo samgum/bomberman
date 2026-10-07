@@ -15,7 +15,7 @@ export function validSnapshot(data) {
 }
 async function pack(text) {
   if (typeof CompressionStream === 'function') {
-    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+    const stream = new Response(text).body.pipeThrough(new CompressionStream('gzip'));
     return { format: 'gzip', data: new Uint8Array(await new Response(stream).arrayBuffer()) };
   }
   return { format: 'json', data: new TextEncoder().encode(text) };
@@ -23,7 +23,7 @@ async function pack(text) {
 async function unpack(record) {
   if (record.format === 'json') return new TextDecoder().decode(record.data);
   if (record.format === 'gzip' && typeof DecompressionStream === 'function') {
-    const stream = new Blob([record.data]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const stream = new Response(record.data).body.pipeThrough(new DecompressionStream('gzip'));
     return new Response(stream).text();
   }
   throw new Error('当前浏览器无法读取此存档');

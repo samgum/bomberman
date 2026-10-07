@@ -1,4 +1,5 @@
-import '../vendor/jsnes/jsnes.min.js';
+import * as runtimeModule from '../vendor/jsnes/jsnes.min.js';
+if(!globalThis.jsnes)globalThis.jsnes=runtimeModule.default || runtimeModule;
 
 export const ROM_HASH = '4e57f08754a2ff7ec788245629fb70f99d4e003f66f86742566bca99c810a244';
 export const CORE_VERSION = '2.1.0';

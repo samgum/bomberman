@@ -8,6 +8,11 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/runtime.test.mjs",
     "test:browser": "node tests/browser.cjs",
+    "test:tablet": "node tests/tablet.cjs",
+    "test:offline": "node tests/offline.cjs",
     "build:rom": "python scripts/build_rom.py"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

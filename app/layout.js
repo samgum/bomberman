@@ -7,6 +7,7 @@ export class GameLayout {
     this.app=document.getElementById('app');
     this.window=document.getElementById('game-window');
     this.immersive=false;
+    this.transitioning=false;
     this.pending=false;
     const schedule=()=>this.schedule();
     window.addEventListener('resize',schedule);
@@ -25,7 +26,8 @@ export class GameLayout {
   }
   resize() {
     this.root.style.setProperty('--app-height',Math.round(window.visualViewport?.height || window.innerHeight)+'px');
-    const autoTouch=matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints>0 && !matchMedia('(pointer:fine)').matches);
+    const ipad=/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints>1;
+    const autoTouch=ipad || matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints>0 && !matchMedia('(pointer:fine)').matches);
     const mode=this.preferences().controlMode;
     this.root.dataset.touch=(mode==='touch' || (mode==='auto' && autoTouch))?'true':'false';
     let segments;
@@ -36,15 +38,15 @@ export class GameLayout {
       if (first.y===second.y && first.x!==second.x) {
         if(first.x>second.x) [first,second]=[second,first];
         this.root.dataset.fold='horizontal';
-        this.root.style.setProperty('--fold-first-width',Math.max(0,first.width-8)+'px');
-        this.root.style.setProperty('--fold-second-width',Math.max(0,second.width-8)+'px');
+        const style=getComputedStyle(this.app);
+        this.root.style.setProperty('--fold-first-width',Math.max(0,first.width-parseFloat(style.paddingLeft))+'px');
+        this.root.style.setProperty('--fold-second-width',Math.max(0,second.width-parseFloat(style.paddingRight))+'px');
         this.root.style.setProperty('--fold-gap',Math.max(0,second.x-first.x-first.width)+'px');
       } else if(first.x===second.x && first.y!==second.y) {
         if(first.y>second.y) [first,second]=[second,first];
         this.root.dataset.fold='vertical';
-        const header=document.querySelector('.topbar').getBoundingClientRect().bottom;
-        const gap=parseFloat(getComputedStyle(this.app).rowGap)||0;
-        this.root.style.setProperty('--fold-first-height',Math.max(80,first.height-header-gap)+'px');
+        const top=document.querySelector('.play-layout').getBoundingClientRect().top;
+        this.root.style.setProperty('--fold-first-height',Math.max(80,first.height-top)+'px');
         this.root.style.setProperty('--fold-gap',Math.max(0,second.y-first.y-first.height)+'px');
       }
     }
@@ -52,13 +54,15 @@ export class GameLayout {
     if(this.root.dataset.touch==='true' && this.root.dataset.fold==='none' && !(innerWidth>innerHeight && innerHeight<=550)) {
       const controls=document.getElementById('touch-controls');
       const style=getComputedStyle(controls);
-      const cell=(controls.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-12)/2;
+      const available=controls.clientWidth || Math.max(0,this.app.clientWidth-16);
+      const cell=(available-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-12)/2;
       const small=innerWidth<=370;
       const scaleLimit=Math.min(cell/(small?132:138),(cell-(small?8:innerWidth<=700?12:16))/(small?120:132));
       controlScale=Math.max(1,Math.min(controlScale,scaleLimit));
     }
     this.root.style.setProperty('--control-scale',controlScale);
-    const width=this.window.clientWidth,height=this.window.clientHeight;
+    const bounds=this.window.getBoundingClientRect();
+    const width=Math.max(1,bounds.width),height=Math.max(1,bounds.height);
     this.window.parentElement.dataset.compact=width<650?'true':'false';
     this.window.parentElement.dataset.tiny=width<360?'true':'false';
     const scale=Math.max(.1,Math.min(width/256,height/240));
@@ -71,9 +75,13 @@ export class GameLayout {
   nativeElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
   updateButtons() {
     const active=!!this.nativeElement() || this.immersive;
+    const native=!!this.nativeElement();
+    this.root.dataset.expanded=active?'true':'false';
+    this.root.dataset.fullscreen=native?'native':this.immersive?'immersive':'none';
     document.querySelectorAll('.fullscreen-control').forEach(button=>{
-      button.textContent=active?'退出全屏':'全屏';
-      button.setAttribute('aria-label',active?'退出全屏':'进入全屏');
+      button.textContent=active?(native?'退出全屏':'退出沉浸'):'全屏';
+      button.setAttribute('aria-label',active?(native?'退出全屏':'退出沉浸模式'):'进入全屏');
+      button.setAttribute('aria-pressed',String(active));
     });
   }
   fullscreenChanged() {
@@ -81,21 +89,32 @@ export class GameLayout {
     this.updateButtons();this.schedule();
   }
   async fullscreen() {
-    if (this.nativeElement()) {
-      const exit=document.exitFullscreen || document.webkitExitFullscreen;
-      if(exit) await exit.call(document);
-    } else if(this.immersive) {
-      this.immersive=false;this.root.dataset.immersive='false';
-    } else {
-      const target=document.documentElement;
-      const enter=target.requestFullscreen || target.webkitRequestFullscreen;
-      try {
-        if(!enter || document.fullscreenEnabled===false) throw new Error('Fullscreen unavailable');
-        await enter.call(target,{navigationUI:'hide'});
-      } catch {
-        this.immersive=true;this.root.dataset.immersive='true';this.toast('已进入沉浸模式，可随时退出。');
+    if(this.transitioning)return;
+    this.transitioning=true;
+    try {
+      if (this.nativeElement()) {
+        const exit=document.exitFullscreen || document.webkitExitFullscreen;
+        if(exit) await exit.call(document);
+      } else if(this.immersive) {
+        this.immersive=false;this.root.dataset.immersive='false';
+      } else {
+        const target=document.documentElement;
+        const standard=target.requestFullscreen && document.fullscreenEnabled!==false;
+        const prefixed=target.webkitRequestFullscreen && document.webkitFullscreenEnabled!==false;
+        try {
+          if(standard)await target.requestFullscreen({navigationUI:'hide'});
+          else if(prefixed)await target.webkitRequestFullscreen();
+          else throw new Error('Fullscreen unavailable');
+        } catch {
+          this.immersive=true;this.root.dataset.immersive='true';
+          this.toast('已切换大画面沉浸模式，横屏可获得更大的游戏画面。');
+        }
       }
+      this.updateButtons();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      this.resize();
+    } finally {
+      this.transitioning=false;
     }
-    this.updateButtons();this.schedule();
   }
 }
