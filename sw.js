@@ -23,6 +23,13 @@ async function status(){
 }
 async function notify(extra={}){const data={type:'OFFLINE_STATUS',state:{...(await status()),...extra}};for(const client of await self.clients.matchAll({includeUncontrolled:true,type:'window'}))client.postMessage(data);}
 async function digest(data){const value=await crypto.subtle.digest('SHA-256',data);return Array.from(new Uint8Array(value),byte=>byte.toString(16).padStart(2,'0')).join('');}
+function storedResponse(data,response){
+  const headers=new Headers(response.headers);
+  // Fetch has already decoded these bytes. Constructing a fresh response also
+  // removes the redirected flag from Pages' /index.html -> / navigation.
+  for(const name of ['content-encoding','content-length','transfer-encoding'])headers.delete(name);
+  return new Response(data,{status:response.status,statusText:response.statusText,headers});
+}
 async function download(){
   await setEnabled(true);
   progress={busy:true,completed:0,total:0};
@@ -30,8 +37,9 @@ async function download(){
   try {
     const response=await fetch(META,{cache:'reload'});
     if(!response.ok)throw new Error('无法下载离线资源清单。');
-    const metadata=response.clone();
-    const meta=await response.json();
+    const manifestBytes=await response.arrayBuffer();
+    const metadata=storedResponse(manifestBytes,response);
+    const meta=JSON.parse(new TextDecoder().decode(manifestBytes));
     if(meta.version!==VERSION || meta.owner!=='samgum/bomberman-classic')throw new Error('资源版本正在更新，请稍后重新下载。');
     const files=meta.files.filter(file=>file.path!=='_headers');
     if(files.some(file=>!file.path || file.path.includes('..') || new URL(file.path,BASE).origin!==self.location.origin))throw new Error('离线资源清单校验失败。');
@@ -44,8 +52,9 @@ async function download(){
         const file=files[cursor++],url=new URL(file.path,BASE).href;
         const response=await fetch(url,{cache:'reload'});
         if(!response.ok)throw new Error('资源下载失败，请检查网络后重试。');
-        if(await digest(await response.clone().arrayBuffer())!==file.sha256)throw new Error('离线资源校验失败，请重新下载。');
-        await staging.put(url,response);
+        const bytes=await response.arrayBuffer();
+        if(await digest(bytes)!==file.sha256)throw new Error('离线资源校验失败，请重新下载。');
+        await staging.put(url,storedResponse(bytes,response));
         progress.completed++;await notify();
       }
     }

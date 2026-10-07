@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const http=require('node:http');
+const zlib=require('node:zlib');
 const base=process.env.BOMBERMAN_BASE_URL || 'http://127.0.0.1:50828';
 const report={base,checks:[]};
 const activeBrowsers=new Set();
@@ -15,10 +16,11 @@ async function isolatedOrigin(){
     if(!online){request.socket.destroy();return;}
     try {
       const pathname=new URL(request.url,'http://localhost').pathname;
+      if(pathname==='/index.html'){response.writeHead(308,{Location:'/'}).end();return;}
       if(pathname===corruptPath){response.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}).end('<svg xmlns="http://www.w3.org/2000/svg"/>');return;}
       const file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
       if(!file.startsWith(root+path.sep)){response.writeHead(403).end();return;}
-      const data=await fs.readFile(file);response.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store'});response.end(data);
+      const data=await fs.readFile(file);response.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store','Content-Encoding':'gzip','Vary':'Accept-Encoding'});response.end(zlib.gzipSync(data));
     } catch {response.writeHead(404).end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -43,7 +45,7 @@ async function check(name,action){await action();report.checks.push(name);consol
     // Playwright's WebKit offline flag rejects cached SW responses before the
     // worker can answer (microsoft/playwright#42775). Cut the isolated origin
     // instead; a fresh no-worker context confirms that the network is unusable.
-    const origin=name==='WebKit'?await isolatedOrigin():null;
+    const origin=name==='WebKit' || process.env.BOMBERMAN_OFFLINE_ORIGIN==='isolated'?await isolatedOrigin():null;
     const url=origin?.url || base;
     const browser=await driver.launch({headless:true});activeBrowsers.add(browser);
     const context=await browser.newContext({viewport:{width:1024,height:768},hasTouch:true});
