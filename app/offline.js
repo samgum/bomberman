@@ -1,3 +1,4 @@
+import { fetchGameResource } from './network.js';
 export class OfflinePackage {
   constructor(render,toast){
     this.render=render;this.toast=toast;this.registration=null;
@@ -25,7 +26,7 @@ export class OfflinePackage {
     try {
       // Source-mode development has no package manifest. The published build
       // owns the root-scope registration and integrity-checked cache.
-      const response=await fetch('build-meta.json',{cache:'no-cache'});
+      const response=await fetchGameResource('build-meta.json',{cache:'no-cache'});
       if(!response.ok){this.sync({ready:false,available:false});return;}
       this.sync({busy:true,available:true});
       this.registration=await navigator.serviceWorker.register('sw.js',{scope:'./',updateViaCache:'none'});

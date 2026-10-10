@@ -1,4 +1,5 @@
 import * as runtimeModule from '../vendor/jsnes/jsnes.min.js';
+import { fetchGameResource } from './network.js';
 if(!globalThis.jsnes)globalThis.jsnes=runtimeModule.default || runtimeModule;
 
 export const ROM_HASH = '4e57f08754a2ff7ec788245629fb70f99d4e003f66f86742566bca99c810a244';
@@ -38,8 +39,7 @@ export class GameEngine {
     const timeout = setTimeout(()=>controller.abort(),20000);
     let response;
     try {
-      response = await fetch('game/bomberman.nes', { cache:'no-cache', signal:controller.signal });
-      if (!response.ok) throw new Error('游戏资源加载失败');
+      response = await fetchGameResource('game/bomberman.nes', { cache:'no-cache', signal:controller.signal });
       this.rom = new Uint8Array(await response.arrayBuffer());
     }
     finally { clearTimeout(timeout); }

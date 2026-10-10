@@ -1,6 +1,7 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), fullscreen=(self), gamepad=(self)
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'
@@ -9,3 +10,8 @@
   Cache-Control: no-cache
 /build-meta.json
   Cache-Control: no-cache
+
+/connection-check
+  Cache-Control: no-cache
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://bomberman.shangganmieya.com https://bomberman-4bs.pages.dev; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'

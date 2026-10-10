@@ -18,7 +18,7 @@ async function isolatedOrigin(){
       const pathname=new URL(request.url,'http://localhost').pathname;
       if(pathname==='/index.html'){response.writeHead(308,{Location:'/'}).end();return;}
       if(pathname===corruptPath){response.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}).end('<svg xmlns="http://www.w3.org/2000/svg"/>');return;}
-      const file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
+      const file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname==='/connection-check'?'/connection-check.html':pathname));
       if(!file.startsWith(root+path.sep)){response.writeHead(403).end();return;}
       let data=await fs.readFile(file);
       if(entryMarker && path.basename(file)==='index.html')data=Buffer.from(data.toString().replace('<body>','<body data-network-entry="'+entryMarker+'">'));
@@ -64,9 +64,9 @@ async function check(name,action){await action();report.checks.push(name);consol
       const state=await packageState(page);assert.equal(state.names.length,1);assert.ok(state.files.includes('/game/bomberman.nes'));
       assert.ok(state.files.some(file=>/game-.*\.js$/.test(file)));
     });
-    if(origin)await check(name+' online reload receives fresh HTML despite cached package',async()=>{
+    if(origin)await check(name+' unversioned changed HTML cannot replace verified cached entry',async()=>{
       origin.markEntry('fresh');await page.reload({waitUntil:'domcontentloaded'});await waitMenu(page);
-      assert.equal(await page.locator('body').getAttribute('data-network-entry'),'fresh');origin.markEntry('');
+      assert.equal(await page.locator('body').getAttribute('data-network-entry'),null);origin.markEntry('');
     });
     if(process.argv[2]==='freshness'){
       await context.close();await browser.close();activeBrowsers.delete(browser);

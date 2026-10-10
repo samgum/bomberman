@@ -10,7 +10,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 http.createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    const target = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
+    const target = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname === '/connection-check' ? '/connection-check.html' : pathname));
     if (!target.startsWith(root + path.sep) || /(?:^|[\\/])\./.test(path.relative(root, target))) {
       response.writeHead(403).end('Forbidden');
       return;

@@ -11,6 +11,8 @@
     "test:tablet": "node tests/tablet.cjs",
     "test:offline": "node tests/offline.cjs",
     "test:interaction": "node tests/interaction.cjs",
+    "test:security": "node tests/security.cjs",
+    "test:connection": "node tests/connection-check.cjs",
     "build:rom": "python scripts/build_rom.py"
   },
   "devDependencies": {

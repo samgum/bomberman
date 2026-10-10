@@ -1,3 +1,4 @@
+import { allowedGameLink } from './network.js';
 export function protectPageInteractions() {
   const touches=new Map();
   let lastTap=null;
@@ -66,6 +67,10 @@ export function protectPageInteractions() {
   window.addEventListener('pagehide',reset);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
   document.addEventListener('click',event=>{
+    const link=event.target instanceof Element?event.target.closest('a[href]'):null;
+    if(link && !allowedGameLink(link.href)){
+      event.preventDefault();event.stopImmediatePropagation();return;
+    }
     if(event.isTrusted && event.detail>0 && lastTap && performance.now()-lastTap.time<750 && lastTap.control.contains(event.target)){
       event.preventDefault();event.stopImmediatePropagation();
     }

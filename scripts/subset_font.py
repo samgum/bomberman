@@ -21,7 +21,7 @@ assert hashlib.sha256(data).hexdigest() == EXPECTED, "Unexpected font release"
 with ZipFile(BytesIO(data)) as archive:
     selected = next(name for name in archive.namelist() if "zh_hans" in name and name.endswith(".woff2"))
     font = TTFont(BytesIO(archive.read(selected)))
-text = (ROOT / "index.html").read_text(encoding="utf-8")
+text = "".join(path.read_text(encoding="utf-8") for path in ROOT.glob("*.html"))
 text += "".join(path.read_text(encoding="utf-8") for path in (ROOT / "app").glob("*.js")) + string.printable
 options = subset.Options()
 options.layout_features = ["*"]

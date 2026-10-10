@@ -7,7 +7,7 @@ import { build,transform } from 'esbuild';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const output=path.join(root,'dist');
 const owner='samgum/bomberman-classic';
-const source=['index.html','manifest.webmanifest','_headers','sw.js','package.json','package-lock.json','scripts/build.mjs','vendor/jsnes/jsnes.min.js','vendor/jsnes/package.json','vendor/jsnes/LICENSE','game/bomberman.nes','assets/FONT-LICENSE.txt'];
+const source=['index.html','connection-check.html','manifest.webmanifest','_headers','sw.js','package.json','package-lock.json','scripts/build.mjs','vendor/jsnes/jsnes.min.js','vendor/jsnes/package.json','vendor/jsnes/LICENSE','game/bomberman.nes','assets/FONT-LICENSE.txt'];
 for(const directory of ['app','assets'])for(const name of await fs.readdir(path.join(root,directory)))if(/\.(js|css|svg|png|woff2)$/.test(name))source.push(directory+'/'+name);
 source.sort();
 const inputs=new Map();
@@ -27,10 +27,18 @@ for(const [name,data] of inputs)if(name.startsWith('assets/') || ['manifest.webm
 published.set(bundleName,Buffer.from(bundle.outputFiles[0].contents));
 published.set(styleName,Buffer.from(style.code));
 let html=inputs.get('index.html').toString().replace('src="app/main.js"','src="'+bundleName+'"').replace('href="app/style.css"','href="'+styleName+'"');
+const sri=data=>'sha384-'+createHash('sha384').update(data).digest('base64');
+html=html.replace('src="'+bundleName+'"','src="'+bundleName+'" integrity="'+sri(published.get(bundleName))+'" crossorigin="anonymous"').replace('href="'+styleName+'"','href="'+styleName+'" integrity="'+sri(published.get(styleName))+'" crossorigin="anonymous"');
 html=html.replace('<html lang="zh-CN" data-phase="loading">','<html lang="zh-CN" data-phase="loading" data-build="'+version+'">');
 html=html.replace('</head>','  <link rel="preload" href="assets/ui-pixel.woff2" as="font" type="font/woff2" crossorigin>\n</head>');
 published.set('index.html',Buffer.from(html));
-published.set('sw.js',Buffer.from(inputs.get('sw.js').toString().replace('__BUILD_VERSION__',version)));
+const checkName='assets/check-'+version+'.js';
+const check=await build({entryPoints:[path.join(root,'app/connection-check.js')],bundle:true,format:'esm',platform:'browser',target:['safari15','chrome90'],minify:true,write:false,legalComments:'none',define:{__BUILD_VERSION__:JSON.stringify(version),__ENTRY_HASH__:JSON.stringify(createHash('sha256').update(published.get('index.html')).digest('hex'))},outfile:path.join(output,checkName)});
+published.set(checkName,Buffer.from(check.outputFiles[0].contents));
+const checkHtml=inputs.get('connection-check.html').toString().replace('src="app/connection-check.js"','src="'+checkName+'" integrity="'+sri(published.get(checkName))+'" crossorigin="anonymous"');
+published.set('connection-check.html',Buffer.from(checkHtml));
+const pins=Object.fromEntries(Array.from(published,([name,data])=>[name,{bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')}]));
+published.set('sw.js',Buffer.from(inputs.get('sw.js').toString().replace('__BUILD_VERSION__',version).replace('/*__ASSET_PINS__*/null',JSON.stringify(pins))));
 published.set('_headers',Buffer.from(inputs.get('_headers').toString()+'\n/'+bundleName+'\n  Cache-Control: public, max-age=31536000, immutable\n/'+styleName+'\n  Cache-Control: public, max-age=31536000, immutable\n/sw.js\n  Cache-Control: no-cache\n'));
 const files=Array.from(published,([name,data])=>({path:name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')})).sort((a,b)=>a.path.localeCompare(b.path));
 try {

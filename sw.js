@@ -1,4 +1,5 @@
 const VERSION='__BUILD_VERSION__';
+const ASSET_PINS=/*__ASSET_PINS__*/null;
 const PREFIX='bomberman-package-';
 const PACKAGE=PREFIX+VERSION;
 const STAGING=PACKAGE+'-staging';
@@ -23,6 +24,21 @@ async function status(){
 }
 async function notify(extra={}){const data={type:'OFFLINE_STATUS',state:{...(await status()),...extra}};for(const client of await self.clients.matchAll({includeUncontrolled:true,type:'window'}))client.postMessage(data);}
 async function digest(data){const value=await crypto.subtle.digest('SHA-256',data);return Array.from(new Uint8Array(value),byte=>byte.toString(16).padStart(2,'0')).join('');}
+async function checkedFetch(url,options={}){
+  const response=await fetch(url,{...options,redirect:'error'});
+  if(!response.ok)throw new Error('游戏连接暂时不可用，请稍后重试。');
+  if(/android\.package/i.test(response.headers.get('Content-Type') || '')){
+    await response.body?.cancel();throw new Error('已阻止异常安装包响应。');
+  }
+  return response;
+}
+async function cachedFile(cache,key,path){
+  const response=await cache.match(key);
+  const expected=ASSET_PINS?.[path];
+  if(!response || !expected)return null;
+  if(await digest(await response.clone().arrayBuffer())!==expected.sha256){await cache.delete(key);return null;}
+  return response;
+}
 function storedResponse(data,response){
   const headers=new Headers(response.headers);
   // Fetch has already decoded these bytes. Constructing a fresh response also
@@ -35,14 +51,15 @@ async function download(){
   progress={busy:true,completed:0,total:0};
   await notify();
   try {
-    const response=await fetch(META,{cache:'reload'});
-    if(!response.ok)throw new Error('无法下载离线资源清单。');
+    const response=await checkedFetch(META,{cache:'reload'});
     const manifestBytes=await response.arrayBuffer();
     const metadata=storedResponse(manifestBytes,response);
     const meta=JSON.parse(new TextDecoder().decode(manifestBytes));
     if(meta.version!==VERSION || meta.owner!=='samgum/bomberman-classic')throw new Error('资源版本正在更新，请稍后重新下载。');
     const files=meta.files.filter(file=>file.path!=='_headers');
     if(files.some(file=>!file.path || file.path.includes('..') || new URL(file.path,BASE).origin!==self.location.origin))throw new Error('离线资源清单校验失败。');
+    const pinned=files.filter(file=>file.path!=='sw.js');
+    if(!ASSET_PINS || pinned.length!==Object.keys(ASSET_PINS).length || pinned.some(file=>ASSET_PINS[file.path]?.sha256!==file.sha256 || ASSET_PINS[file.path]?.bytes!==file.bytes))throw new Error('资源清单与当前游戏版本不一致。');
     progress.total=files.length;
     await caches.delete(STAGING);
     const staging=await caches.open(STAGING);
@@ -50,8 +67,8 @@ async function download(){
     async function worker(){
       while(cursor<files.length){
         const file=files[cursor++],url=new URL(file.path,BASE).href;
-        const response=await fetch(url,{cache:'reload'});
-        if(!response.ok)throw new Error('资源下载失败，请检查网络后重试。');
+        const target=file.path==='index.html'?BASE:file.path.endsWith('.html')?new URL(file.path.slice(0,-5),BASE).href:url;
+        const response=await checkedFetch(target,{cache:'reload'});
         const bytes=await response.arrayBuffer();
         if(await digest(bytes)!==file.sha256)throw new Error('离线资源校验失败，请重新下载。');
         await staging.put(url,storedResponse(bytes,response));
@@ -105,17 +122,41 @@ self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
   if(!['http:','https:'].includes(url.protocol) || request.method!=='GET' || url.origin!==self.location.origin)return;
   event.respondWith((async()=>{
-    // Online navigation must see a deployed input fix immediately; cached HTML
-    // remains the fallback when the network is unavailable.
-    if(request.mode==='navigate' || url.pathname===new URL(META).pathname){
-      try {const response=await fetch(request);if(response.ok || response.type==='opaqueredirect')return response;}
-      catch { /* A complete offline package serves the same entry point. */ }
+    // Only this release's verified entry can be returned by this worker.
+    // Registration updates install a new set of pins for a later release.
+    const entry=request.mode==='navigate' && [new URL(BASE).pathname,new URL('index.html',BASE).pathname].includes(url.pathname);
+    if(entry){
+      const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);
+      try {
+        const target=new URL(BASE);target.search=url.search;
+        const response=await checkedFetch(target.href,{cache:'no-cache',signal:controller.signal});
+        if(!/text\/html/i.test(response.headers.get('Content-Type') || ''))throw new Error('游戏入口响应异常。');
+        if(await digest(await response.clone().arrayBuffer())!==ASSET_PINS?.['index.html']?.sha256)throw new Error('游戏入口未通过当前版本校验。');
+        return response;
+      } catch {
+        if(await caches.has(PACKAGE)){
+          const cache=await caches.open(PACKAGE);
+          const safe=await cachedFile(cache,BASE,'index.html');
+          if(safe)return safe;
+        }
+        // A user who deleted the offline package still needs an update check
+        // when an old controller encounters a newly deployed entry.
+        try {event.waitUntil(self.registration.update().catch(()=>{}));}catch { /* Keep the error page local. */ }
+        return new Response('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>连接暂时不可用</title><body style="background:#0b151c;color:#f7ecd2;font:18px/1.8 system-ui;padding:32px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none"><h1>已停止异常跳转</h1><p>游戏入口未通过校验，可能是版本正在更新或当前连接异常。请稍等几秒后重试。游戏存档仍保留在当前浏览器。</p><p><a style="color:#ffdb8c" href="./">重新打开游戏</a></p><a style="color:#ffdb8c" href="https://bomberman-4bs.pages.dev/connection-check">检查连接</a></body></html>',{status:503,headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"}});
+      } finally {clearTimeout(timeout);}
     }
-    if(!await caches.has(PACKAGE))return fetch(request);
+    if(url.pathname===new URL(META).pathname){
+      try {return await checkedFetch(request,{cache:'no-cache'});}
+      catch { /* Read the previously verified manifest while offline. */ }
+    }
+    const relative=decodeURIComponent(url.pathname.slice(new URL(BASE).pathname.length));
+    const path=relative==='connection-check'?'connection-check.html':relative;
+    const target=path==='connection-check.html'?new URL('connection-check',BASE).href:request;
+    if(!await caches.has(PACKAGE))return checkedFetch(target);
     const cache=await caches.open(PACKAGE);
-    const key=request.mode==='navigate'?BASE:new URL(url.pathname,BASE).href;
-    const cached=await cache.match(key);
+    const key=new URL(path,BASE).href;
+    const cached=path==='build-meta.json'?await cache.match(key):await cachedFile(cache,key,path);
     if(cached)return cached;
-    return fetch(request);
+    return checkedFetch(target);
   })());
 });
